@@ -1,6 +1,8 @@
 package Net::Rserve;
+our $VERSION = '0.01';
 use strict;
 use warnings;
+use 5.010;
 use Carp();
 use Data::Dumper;
 use IO::Socket::INET;
@@ -23,9 +25,9 @@ sub run {
 		warn '$result = ', Data::Dumper->new( [ $result ] )->Terse( 1 )->Dump;
 	}
 
+#	my $command = q{list( 1, 2, 3 )};
 #	my $command = 'c( 0.1 + 0.2, 0.4, 0.5 )';
 #	my $command = q{c("abc", "xyz", 0.1, 'qrs')};
-#	my $command = q{list( 1, 2, 3 )};
 #	my $command = q{list( 1, 'abc', 0.3 )};
 #	my $command = q{pairlist( 'a', 1, 'b', 2 )};
 #	my $command = q{pairlist( 'a' = 1, 'b' = 2 )};
@@ -307,8 +309,8 @@ sub parse_sexp {
 	# unimplemented type in Rserve
 	if( $sexp_type == Rsrv::XT_UNKNOWN ) {
 		warn 'XT_UNKNOWN' if verbose;
-		my $uit = $self->unpack_32bit_int( $response, $i, 4 );
-		warn "Note: result contains type $uit unsupported by Rserve.";
+		my $unimplemented_type = $self->unpack_32bit_int( $response, $i, 4 );
+		warn "Note: result contains type $unimplemented_type unsupported by Rserve.";
 		return;
 	}
 
@@ -317,4 +319,39 @@ sub parse_sexp {
 }
 
 1;
+
+=head1 NAME
+
+Net::Rserve
+
+=head1 SYNOPSIS
+
+  use strict;
+  use warnings;
+  use Data::Dumper;
+  use Net::Rserve();
+  my $rserve = Net::Rserve->new;
+  my $result = $rserve->run_command( "list(str=R.version.string,foo=1:10,bar=1:5/2,logic=c(TRUE,FALSE,NA))" );
+  warn Dumper( $result );
+
+=head1 DESCRIPTION
+
+  An adaptation of C<simple.php> by Simon Urbanek.
+
+=head1 CAVEATS
+
+Apparently, if variables are set in one connection, they will still be available in other connections.
+Once all connections are gone, the variables are apparently cleaned up and not available to 
+subsequent connections.
+
+=head1 LICENSE
+
+This library is free software and may be distributed under the same terms
+as perl itself.
+
+=head1 AUTHOR
+
+Ben B.
+
+=cut
 

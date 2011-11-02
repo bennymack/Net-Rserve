@@ -7,12 +7,135 @@ use parent 'Test::Class';
 use IPC::Open3 qw(open3);
 use Symbol 'gensym';
 use Test::More;
+use Test::Exception;
+use constant RSERVE_SKIP_NETWORK_TESTS => $ENV{RSERVE_SKIP_NETWORK_TESTS};
 
 __PACKAGE__->new->runtests if not caller;
 
 sub start : Tests(startup => 1) {
 	my( $self ) = @ARG;
 	require_ok( $self->TEST_PACKAGE );
+}
+
+sub test_run_command_1 : Tests {
+	my( $self ) = @ARG;
+	return 'Skipping Rserve network tests' if $self->RSERVE_SKIP_NETWORK_TESTS;
+
+	my $rserve;
+	lives_ok { $rserve = $self->TEST_PACKAGE->new; };
+	isa_ok( $rserve, $self->TEST_PACKAGE );
+
+	do {
+		my $result = $rserve->run_command( 'list( 1, 2, 3 )' );
+		is_deeply( $result,  [ 1, 2, 3 ] );
+	};
+
+	do {
+		my $result = $rserve->run_command( 'c( 0.1 + 0.2, 0.4, 0.5 )' );
+		is_deeply( $result,  [ '0.3', '0.4', '0.5' ] );
+	};
+
+	do {
+		my $result = $rserve->run_command( q{c("abc", "xyz", 0.1, 'qrs')} );
+		is_deeply( $result,  [ 'abc', 'xyz', '0.1', 'qrs' ] );
+	};
+
+	do {
+		my $result = $rserve->run_command( q{list( 1, 'abc', 0.3 )} );
+		is_deeply( $result,  [ '1', 'abc', '0.3' ] );
+	};
+
+	do {
+		my $result = $rserve->run_command( q{pairlist( 'a', 1, 'b', 2 )} );
+		is_deeply( $result,  [ 'a', '1', 'b', '2' ] );
+	};
+
+	do {
+		my $result = $rserve->run_command( q{pairlist( 'a' = 1, 'b' = 2 )} );
+		is_deeply( $result,   { 'a' => '1', 'b' => '2' } );
+	};
+
+	do {
+		my $result = $rserve->run_command( q{c( 1, 2, 3 )} );
+		is_deeply( $result, [ 1, 2, 3 ] );
+	};
+
+	do {
+		my $result = $rserve->run_command( q{c( 1, 2, 3 )} );
+		is_deeply( $result, [ 1, 2, 3 ] );
+	};
+
+	do {
+		my $result = $rserve->run_command( q{c( "a", "b", "c" )} );
+		is_deeply( $result, [ 'a', 'b', 'c' ] );
+	};
+
+	do {
+		my $result = $rserve->run_command( q{list( TRUE, FALSE, TRUE, NA )} );
+		is_deeply( $result, [ 1, 0, 1, undef ] );
+	};
+
+	do {
+		my $result = $rserve->run_command( q{list( a = 1, b = 2 )} );
+		is_deeply( $result,  { 'a' => '1', 'b' => '2' } );
+	};
+
+	do {
+		my $result = $rserve->run_command( q{list( 0.1 + 0.2, 0.1 + 0.5 )} );
+		is_deeply( $result, [ '0.3', '0.6' ] );
+	};
+
+	do {
+		my $result = $rserve->run_command( q'list(str=R.version.string,foo=1:10,bar=1:5/2,logic=c(TRUE,FALSE,NA))' );
+		is_deeply( $result,  {
+				'bar' => [
+					'0.5',
+					'1',
+					'1.5',
+					'2',
+					'2.5'
+				],
+				'str' => 'R version 2.13.2 (2011-09-30)',
+				'foo' => [
+					1,
+					2,
+					3,
+					4,
+					5,
+					6,
+					7,
+					8,
+					9,
+					10
+				],
+				'logic' => [
+					1,
+					0,
+					undef
+				]
+			}
+		);
+	};
+
+	do {
+		is( $rserve->run_command( q{x <- 1} ), 1 );
+		is( $rserve->run_command( q{y <- 0.1} ), 0.1 );
+		is( $rserve->run_command( q{x + y} ), 1.1 );
+	};
+
+	do {
+		# x and y ARE available on this connection.
+		my $rserve1 = $self->TEST_PACKAGE->new;
+		lives_ok { is( $rserve->run_command( q{x + y} ), 1.1 ); };
+	};
+
+	undef $rserve;
+
+	do {
+		# x and y are NOT available on this connection.
+		my $rserve1 = $self->TEST_PACKAGE->new;
+		dies_ok { warn 'x + y ', $rserve->run_command( q{x + y} ); };
+	};
 }
 
 sub test_int8 : Tests {

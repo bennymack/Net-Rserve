@@ -41,7 +41,7 @@ function int24($buf, $o=0) { return (ord($buf[$o]) | (ord($buf[$o + 1]) << 8) | 
 function int32($buf, $o=0) { return (ord($buf[$o]) | (ord($buf[$o + 1]) << 8) | (ord($buf[$o + 2]) << 16) | (ord($buf[$o + 3]) << 24)); }
 function mkint32($i) { $r = chr($i & 255); $i >>= 8; $r .= chr($i & 255); $i >>=8; $r .= chr($i & 255); $i >>=8; $r .= chr($i & 255); return $r; }
 function mkint24($i) { $r = chr($i & 255); $i >>= 8; $r .= chr($i & 255); $i >>=8; $r .= chr($i & 255); return $r; }
-function flt64($buf, $o=0) { $ss = substr($buf, $o, 8); echo "ss = $ss"; if ($machine_is_bigendian) for ($k = 0; $k < 7; $k++) $ss[7 - $k] = $buf[$o + $k]; $r = unpack("d", substr($buf, $o, 8)); return $r[1]; }
+function flt64($buf, $o=0) { $ss = substr($buf, $o, 8); if ($machine_is_bigendian) for ($k = 0; $k < 7; $k++) $ss[7 - $k] = $buf[$o + $k]; $r = unpack("d", substr($buf, $o, 8)); return $r[1]; }
 
 function mkp_str($cmd, $string) {
 	$n = strlen($string) + 1; $string .= chr(0);
@@ -70,19 +70,22 @@ function parse_SEXP($buf, $offset, $attr = NULL) {
 	$rl = int24($r, $i + 1);
 	$i += 4;
 	$offset = $eoa = $i + $rl;
- echo "[data type ".($ra & 63).", length ".$rl." with payload from ".$i." to ".$eoa."]<br/>\n";
+	echo "[data type ".($ra & 63).", length ".$rl." with payload from ".$i." to ".$eoa."]<br/>\n";
 	if (($ra & 64) == 64) {
 		echo "sorry, long packets are not supported (yet)."; return FALSE;
 	}
 	if ($ra > 127) {
 		$ra &= 127;
 		$al = int24($r, $i + 1);
+		echo "before al = $al, i = $i\n";
 		$attr = parse_SEXP($buf, $i);
+		echo "after al = $al, i = $i\n";
 		$i += $al + 4;
 	} 
 	if ($ra == 0) return NULL;
 	if ($ra == 16) { // generic vector
 		$a = array();
+		echo "i = $i, eoa = $eoa";
 		while ($i < $eoa)
 			$a[] = parse_SEXP($buf, &$i);
 		// if the 'names' attribute is set, convert the plain array into a map
@@ -263,7 +266,9 @@ if ($s == FALSE) {
 #	print_r (Rserve_eval($s, "{x=rnorm(10); y=x+rnorm(10)/2; lm(y~x)}"));
 #	echo "<p/>";
 #	print_r (Rserve_eval($s, " list( 0.1 + 0.2, 0.1 + 0.5 )"));
-	print_r (Rserve_eval($s, "0.1 + 0.2"));
+#	print_r (Rserve_eval($s, "0.1 + 0.2"));
+#	print_r (Rserve_eval($s, "pairlist( 'a' = 1, 'b' = 2 )"));
+	print_r (Rserve_eval($s, "list( a = 1, b = 2 )"));
 
 	Rserve_close($s);
 }

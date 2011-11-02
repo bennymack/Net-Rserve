@@ -14,24 +14,14 @@ __PACKAGE__->run if not caller;
 sub run {
 	my( $class ) = @ARG;
 
-	my $self = bless {}, $class;
+	my $self = $class->new;
+	warn '$self = ', Dumper( $self ) if verbose;
 
-	$self->{socket} = IO::Socket::INET->new(
-		PeerAddr => '127.0.0.1:6311',
-		Type     => SOCK_STREAM,
-		Blocking => 1,
-	) or die 'Error connection - ', $OS_ERROR;
-
-	do {
-		my $read = sysread $self->{socket}, my $buffer, 4096;
-		die sprintf 'invalid header? %d != 32', $read if 32 != $read;
-		warn '$buffer = ', $buffer;
-		$self->{rserve_id_signature} = substr $buffer, 0, 4;
-		$self->{rserve_version_protocol} = substr $buffer, 4, 4;
-		$self->{rserve_communication_protocol} = substr $buffer, 8, 4;
-	};
-
-	warn '$self = ', Dumper( $self );
+	while( my $command = <STDIN> ) {
+		chomp $command;
+		my $result = $self->run_command( $command );
+		warn '$result = ', Data::Dumper->new( [ $result ] )->Terse( 1 )->Dump;
+	}
 
 #	my $command = 'c( 0.1 + 0.2, 0.4, 0.5 )';
 #	my $command = q{c("abc", "xyz", 0.1, 'qrs')};
@@ -43,13 +33,40 @@ sub run {
 #	my $command = 'c( "a", "b", "c" )';
 #	my $command = 'list( TRUE, FALSE, TRUE )';
 #	my $command = 'list( a = 1, b = 2 )';
+#	my $command = "list( 0.1 + 0.2, 0.1 + 0.5 )";
 
+	# From simple.php
 #	my $command = "{x=rnorm(10); y=x+rnorm(10)/2; lm(y~x)}";
-#	my $command = " list( 0.1 + 0.2, 0.1 + 0.5 )";
-	my $command = "list(str=R.version.string,foo=1:10,bar=1:5/2,logic=c(TRUE,FALSE,NA))";
+#	my $command = "list(str=R.version.string,foo=1:10,bar=1:5/2,logic=c(TRUE,FALSE,NA))";
 
+}
 
-	my $packet  = $self->make_packet_string( Rsrv::CMD_eval, $command );
+sub new {
+	my( $class ) = @ARG;
+
+	my $self = bless {}, $class;
+
+	$self->{socket} = IO::Socket::INET->new(
+		PeerAddr => '127.0.0.1:6311',
+		Type     => SOCK_STREAM,
+		Blocking => 1,
+	) or die 'Error connection - ', $OS_ERROR;
+
+	my $read = sysread $self->{socket}, my $buffer, 32;
+	die sprintf 'invalid header? %d != 32', $read if 32 != $read;
+	warn '$buffer = ', $buffer if verbose;
+	$self->{rserve_id_signature} = substr $buffer, 0, 4;
+	$self->{rserve_version_protocol} = substr $buffer, 4, 4;
+	$self->{rserve_communication_protocol} = substr $buffer, 8, 4;
+
+	return $self;
+}
+
+sub run_command {
+	my( $self, $command_string ) = @ARG; 
+	die 'Need a $command_string' if not $command_string;
+
+	my $packet  = $self->make_packet_string( Rsrv::CMD_eval, $command_string );
 	syswrite $self->{socket}, $packet;
 
 	my $response = $self->get_response;
@@ -65,8 +82,8 @@ sub run {
 	}
 
 	my $i = 20;
-	warn 'parse_sexp = ', Dumper( $self->parse_sexp( $response, \$i, ) );
-
+	my $result = $self->parse_sexp( $response, \$i, );
+	return $result;
 }
 
 sub make_packet_string {
@@ -162,10 +179,9 @@ sub parse_sexp {
 		die 'sorry, long packets are not supported (yet).';
 	}
 
-	# Not sure what this is.
 	my $attr_href;
 	if( $sexp_type > 127 ) {
-		warn 'doing something';
+		warn 'ATTR NAMES' if verbose;
 		$sexp_type &= 127;
 		my $attribute_length = $self->unpack_24bit_int( substr $response, $i + 1, 3 );
 		my $tmpi = $i; # Don't want to persist change to $i here.
@@ -175,6 +191,7 @@ sub parse_sexp {
 	} 
 
 	if( $sexp_type == 0 ) {
+		warn 'SEXP_TYPE 0' if verbose;
 		return;
 	}
 
@@ -182,10 +199,8 @@ sub parse_sexp {
 	if( $sexp_type == Rsrv::XT_VECTOR ) {
 		warn 'XT_VECTOR' if verbose;
 		my @vector;
-		warn '$i = ', $i, ', $end_of_sexp = ', $end_of_sexp;
 		while( $i < $end_of_sexp ) {
 			push @vector, $self->parse_sexp( $response, \$i );
-#			warn 'pushed onto @vector ', Dumper( $vector[ -1 ] );
 		}
 		# if the 'names' attribute is set, convert the plain array into a map
 		if( my $names_aref = $attr_href->{names} ) {
@@ -193,7 +208,6 @@ sub parse_sexp {
 			for my $k ( 0 .. $#vector ) {
 				$vector{ $names_aref->[ $k ] } = $vector[ $k ];
 			}
-#			warn 'got $names_aref = ', Dumper( $names_aref ), ', @vector = ', Dumper( \@vector ), ', %vector = ', Dumper( \%vector );
 			return \%vector;
 		}
 		return \@vector;

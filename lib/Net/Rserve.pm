@@ -205,12 +205,17 @@ sub parse_sexp {
 			push @vector, $self->parse_sexp( $response, \$i );
 		}
 		# if the 'names' attribute is set, convert the plain array into a map
-		if( my $names_aref = $attr_href->{names} ) {
-			my %vector;
-			for my $k ( 0 .. $#vector ) {
-				$vector{ $names_aref->[ $k ] } = $vector[ $k ];
+		if( my $names_thing = $attr_href->{names} ) {
+			if( not ref $names_thing ) {
+				return { $names_thing => $vector[ 0 ] }; # fast and loose.
 			}
-			return \%vector;
+			else {
+				my %vector;
+				for my $k ( 0 .. $#vector ) {
+					$vector{ $names_thing->[ $k ] } = $vector[ $k ];
+				}
+				return \%vector;
+			}
 		}
 		return \@vector;
 	}

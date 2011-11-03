@@ -86,6 +86,28 @@ sub test_run_command_1 : Tests {
 	};
 
 	do {
+		my $result = $rserve->run_command( q{list( l1 = list( l1a = 1:5 ), l2 = 1:5/2 )} );
+		is_deeply( $result, {
+			'l1' => {
+				'l1a' => [
+					1,
+					2,
+					3,
+					4,
+					5
+				]
+			},
+			'l2' => [
+				'0.5',
+				'1',
+				'1.5',
+				'2',
+				'2.5'
+			]
+		} );
+	};
+
+	do {
 		my $result = $rserve->run_command( q'list(str=R.version.string,foo=1:10,bar=1:5/2,logic=c(TRUE,FALSE,NA))' );
 		is_deeply( $result,  {
 				'bar' => [

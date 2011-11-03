@@ -268,7 +268,8 @@ if ($s == FALSE) {
 #	print_r (Rserve_eval($s, " list( 0.1 + 0.2, 0.1 + 0.5 )"));
 #	print_r (Rserve_eval($s, "0.1 + 0.2"));
 #	print_r (Rserve_eval($s, "pairlist( 'a' = 1, 'b' = 2 )"));
-	print_r (Rserve_eval($s, "list( a = 1, b = 2 )"));
+#	print_r (Rserve_eval($s, "list( a = 1, b = 2 )"));
+	print_r (Rserve_eval($s, "list( l1 = list( l1a = 1:5 ), l2 = 1:5/2 )"));
 
 	Rserve_close($s);
 }

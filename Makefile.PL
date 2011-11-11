@@ -11,6 +11,7 @@ test_requires  'Test::Exception'          => '0';
 #recommends     'Text::CSV_XS'             => '0.50';
 #no_index       'directory'   => 'demos';
 #install_script 'myscript';
+tests           't/Net/*Test.pm';
 
 WriteAll;
 
